@@ -46,6 +46,7 @@ end
 
 Telegram::Bot::Client.run(BOT_TOKEN) do |bot|
   $logger = Logger.new STDOUT
+  $logger.level = LOG_LEVEL
   $logger.datetime_format = '%Y-%m-%d %H:%M:%S'
   me = Hashie::Mash.new(bot.api.get_me).result
 
