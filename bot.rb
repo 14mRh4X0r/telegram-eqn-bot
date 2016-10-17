@@ -15,20 +15,20 @@ def render id, text
   Dir.chdir path do
     File.open('render.tex', 'w') do |file|
       file.write <<EOF
-\\documentclass[preview]{standalone}
-\\usepackage{mathtools,esint}
+\\documentclass[preview,varwidth,border=1pt]{standalone}
+\\usepackage{mathtools,amssymb,esint,commath}
 \\begin{document}
-  $\\displaystyle
+  \\begin{displaymath}
     #{text}
-  $
+  \\end{displaymath}
 \\end{document}
 EOF
     end
 
-    res = system 'pdflatex -no-shell-escape -interaction=nonstopmode render.tex >& /dev/null'
+    res = system 'pdflatex -no-shell-escape -interaction=nonstopmode render.tex >/dev/null 2>&1'
     $logger.warn { "Got nonzero exit code when running pdflatex for #{id}" } unless res
 
-    s = StringIO.new `convert -density 300 render.pdf -quality 90 webp:-`
+    s = StringIO.new `timeout -k 5 5 convert -density 300 render.pdf -quality 90 webp:/dev/stdout`
 
     Dir.foreach '.' do |entry|
       File.delete entry unless File.directory? entry
@@ -63,8 +63,10 @@ Telegram::Bot::Client.run(BOT_TOKEN) do |bot|
             cmd, who = cmd.split '@' if cmd.include? '@'
             next if not cmd.eql? 'render' or not who.nil? and not who.eql? me.username
 
+            bot.api.send_chat_action chat_id: msg.chat.id,
+                                     action: 'upload_document'
             fork do
-              io = render "#{msg.message_id}-#{msg.chat.id}", msg.text[('/render '.length)..-1]
+              io = render "#{msg.message_id}-#{msg.chat.id}", msg.text[("/render#{'@' + who unless who.nil?} ".length)..-1]
               bot.api.send_sticker chat_id: msg.chat.id,
                                    #reply_to_message_id: msg.message_id,
                                    sticker: Faraday::UploadIO.new(io, 'image/webp')
